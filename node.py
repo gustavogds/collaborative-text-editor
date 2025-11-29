@@ -5,7 +5,7 @@ import time
 import traceback
 from typing import List, Tuple
 
-from .utils import VectorClock, PositionID, Char
+from utils import VectorClock, PositionID, Char
 
 
 class Node:
@@ -17,7 +17,7 @@ class Node:
         self.port = port
         self.peer_addrs = peer_addrs
         self.vclock = VectorClock()
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
         # Replica state: list of Char objects (including deleted ones)
         # We maintain this list in a stable deterministic order (using PositionID comparator + insertion heuristics)
