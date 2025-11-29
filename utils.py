@@ -3,10 +3,12 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 
+# Gerencia o relógio vetorial para rastreamento causal
 class VectorClock:
     def __init__(self, d: Optional[Dict[str, int]] = None):
         self.v = dict(d) if d else {}
 
+    # Incrementa o contador do nó local antes de um evento
     def increment(self, site: str):
         self.v[site] = self.v.get(site, 0) + 1
 

@@ -1,5 +1,7 @@
 import json
+import socket
 import threading
+import time
 import traceback
 from typing import List, Tuple
 
@@ -16,21 +18,30 @@ class Node:
         self.peer_addrs = peer_addrs
         self.vclock = VectorClock()
         self.lock = threading.Lock()
+
+        # Replica state: list of Char objects (including deleted ones)
+        # We maintain this list in a stable deterministic order (using PositionID comparator + insertion heuristics)
         self.replica: List[Char] = []
+
+        # seen operations to prevent reapplying
         self.seen_ops = set()
 
+        # Networking
         self.server_sock = None
         self.peer_sockets = {}
         self.listener_thread = None
         self.stop_event = threading.Event()
 
+        # start listening and connect to peers
         self._start_networking()
 
     def insert(self, caractere: str, position_index: int):
         with self.lock:
+            # increment local clock
             self.vclock.increment(self.site_id)
             pid = PositionID(self.vclock.copy(), self.site_id)
 
+            # Determine pos_id (PositionID of previous char)
             pos_id = None
             visible = [c for c in self.replica if not c.deleted]
             if position_index < -1:
@@ -46,6 +57,7 @@ class Node:
                 else:
                     pos_id = visible[position_index].id
 
+            # Create op message
             op = {
                 "type": "insert",
                 "site_id": self.site_id,
@@ -53,7 +65,9 @@ class Node:
                 "char": caractere,
                 "op_id": pid.serialize(),
             }
+            # apply locally via merge
             self.merge(op, origin_local=True)
+            # broadcast
             self._broadcast(op)
 
     def delete(self, position_index: int):
@@ -145,3 +159,151 @@ class Node:
                     print("Unknown op type:", typ)
         except Exception:
             traceback.print_exc()
+    
+    # Networking methods
+    def _start_networking(self):
+        # start server
+        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_sock.bind((self.host, self.port))
+        self.server_sock.listen(5)
+        self.listener_thread = threading.Thread(target=self._accept_loop, daemon=True)
+        self.listener_thread.start()
+
+        # start connector thread to peers
+        ct = threading.Thread(target=self._connect_to_peers_loop, daemon=True)
+        ct.start()
+
+    def _accept_loop(self):
+        while not self.stop_event.is_set():
+            try:
+                client, addr = self.server_sock.accept()
+                t = threading.Thread(target=self._handle_conn, args=(client, addr), daemon=True)
+                t.start()
+            except Exception:
+                pass
+
+    def _connect_to_peers_loop(self):
+        # try to connect to peers (idempotent)
+        while not self.stop_event.is_set():
+            for (ph, pp) in self.peer_addrs:
+                addr_str = f"{ph}:{pp}"
+                if addr_str in self.peer_sockets:
+                    continue
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(2.0)
+                    s.connect((ph, pp))
+                    s.settimeout(None)
+                    self.peer_sockets[addr_str] = s
+                    t = threading.Thread(target=self._handle_conn, args=(s, (ph,pp)), daemon=True)
+                    t.start()
+                    self._send_message(s, {"type":"sync_request", "site_id": self.site_id})
+                except Exception:
+                    time.sleep(0.1)
+            time.sleep(1.0)
+
+    def _handle_conn(self, conn: socket.socket, addr):
+        # handle messages line-delimited JSON
+        try:
+            buf = b""
+            while not self.stop_event.is_set():
+                data = conn.recv(4096)
+                if not data:
+                    break
+                buf += data
+                # messages separated by newline
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    try:
+                        msg = json.loads(line.decode())
+                        self._process_incoming(msg, conn)
+                    except Exception:
+                        traceback.print_exc()
+                        continue
+        except Exception:
+            pass
+        finally:
+            # remove from peer_sockets if present
+            try:
+                conn.close()
+            except Exception:
+                pass
+            keys = [k for k,v in self.peer_sockets.items() if v==conn]
+            for k in keys:
+                del self.peer_sockets[k]
+
+    def _process_incoming(self, msg: dict, conn: socket.socket):
+        typ = msg.get("type")
+        if typ == "sync_request":
+            snapshot = [c.serialize() for c in self.replica]
+            resp = {"type":"sync_response", "site_id": self.site_id, "snapshot": snapshot}
+            self._send_message(conn, resp)
+            return
+        if typ == "sync_response":
+            snapshot = msg.get("snapshot", [])
+            for cobj in snapshot:
+                pseudo = {
+                    "type":"insert",
+                    "site_id": msg.get("site_id"),
+                    "pos_id": None,
+                    "char": cobj["value"],
+                    "op_id": cobj["id"]
+                }
+                if cobj.get("deleted"):
+                    # apply insert first then delete
+                    self.merge(pseudo)
+                    del_op = {"type":"delete", "site_id": self.site_id, "target_id": cobj["id"], "op_id": {"target": cobj["id"], "deleter_site": msg.get("site_id"), "vc": {}}}
+                    self.merge(del_op)
+                else:
+                    self.merge(pseudo)
+            return
+        # apply merge
+        self.merge(msg)
+
+    def _send_message(self, conn: socket.socket, msg: dict):
+        try:
+            payload = (json.dumps(msg, sort_keys=True) + "\n").encode()
+            conn.sendall(payload)
+        except Exception:
+            # if send fails, remove socket
+            keys = [k for k,v in self.peer_sockets.items() if v==conn]
+            for k in keys:
+                try:
+                    del self.peer_sockets[k]
+                except Exception:
+                    pass
+
+    def _broadcast(self, msg: dict):
+        dead = []
+        for k,s in list(self.peer_sockets.items()):
+            try:
+                self._send_message(s, msg)
+            except Exception:
+                dead.append(k)
+        for k in dead:
+            try:
+                del self.peer_sockets[k]
+            except Exception:
+                pass
+
+    def visible_text(self) -> str:
+        with self.lock:
+            return "".join([c.value for c in self.replica if not c.deleted])
+
+    def show_full(self):
+        with self.lock:
+            for idx, c in enumerate(self.replica):
+                print(f"{idx}: '{c.value}' id={c.id} deleted={c.deleted}")
+
+    def stop(self):
+        self.stop_event.set()
+        try:
+            self.server_sock.close()
+        except Exception:
+            pass
+        for s in list(self.peer_sockets.values()):
+            try:
+                s.close()
+            except Exception:
+                pass
