@@ -2,17 +2,17 @@
 
 ### Terminal 1
 ```bash
-python node.py --site-id A --port 9001 --peers 127.0.0.1:9002,127.0.0.1:9003
+python main.py --site-id A --port 9001 --peers 127.0.0.1:9002,127.0.0.1:9003
 ```
 
 ### Terminal 2
 ```bash
-python node.py --site-id B --port 9002 --peers 127.0.0.1:9001,127.0.0.1:9003
+python main.py --site-id B --port 9002 --peers 127.0.0.1:9001,127.0.0.1:9003
 ```
 
 ### Terminal 3
 ```bash
-python node.py --site-id C --port 9003 --peers 127.0.0.1:9001,127.0.0.1:9002
+python main.py --site-id C --port 9003 --peers 127.0.0.1:9001,127.0.0.1:9002
 ```
 
 ## How to Use (WIP)
