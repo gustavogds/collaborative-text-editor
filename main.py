@@ -1,19 +1,23 @@
-import argparse
-
 from node import Node
 
-
-def parse_peer_list(s: str):
-    if not s:
-        return []
-    parts = s.split(",")
-    out = []
-    for p in parts:
-        if not p.strip():
-            continue
-        hp = p.strip().split(":")
-        out.append((hp[0], int(hp[1])))
-    return out
+# Configuração fixa dos nós.
+NODES_CONFIG = {
+    "1": {
+        "host": "127.0.0.1",
+        "port": 5001,
+        "peers": [("127.0.0.1", 5002), ("127.0.0.1", 5003)],
+    },
+    "2": {
+        "host": "127.0.0.1",
+        "port": 5002,
+        "peers": [("127.0.0.1", 5001), ("127.0.0.1", 5003)],
+    },
+    "3": {
+        "host": "127.0.0.1",
+        "port": 5003,
+        "peers": [("127.0.0.1", 5001), ("127.0.0.1", 5002)],
+    },
+}
 
 
 def repl(node: Node):
@@ -56,14 +60,23 @@ def repl(node: Node):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--site-id", required=True)
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, required=True)
-    parser.add_argument("--peers", default="", help="comma separated host:port list")
-    args = parser.parse_args()
-    peers = parse_peer_list(args.peers)
-    node = Node(args.site_id, args.host, args.port, peers)
+    print("=== Collaborative Text Editor (CRDT) ===")
+    print("Nós disponíveis: 1, 2, 3")
+    site_id = input("Digite o site ID (1, 2 ou 3): ").strip()
+
+    if site_id not in NODES_CONFIG:
+        print(f"Site ID inválido: {site_id}")
+        exit(1)
+
+    cfg = NODES_CONFIG[site_id]
+    host = cfg["host"]
+    port = cfg["port"]
+    peers = cfg["peers"]
+
+    print(f"Iniciando nó {site_id} em {host}:{port}")
+    print(f"Peers: {peers}")
+
+    node = Node(site_id, host, port, peers)
     try:
         repl(node)
     finally:

@@ -1,38 +1,55 @@
-## How to Run
+## Como Rodar
 
 ### Terminal 1
 ```bash
-python main.py --site-id A --port 9001 --peers 127.0.0.1:9002,127.0.0.1:9003
+python main.py 
 ```
+- Dentro do CLI inserir 1 e pressionar enter.
 
 ### Terminal 2
 ```bash
-python main.py --site-id B --port 9002 --peers 127.0.0.1:9001,127.0.0.1:9003
+python main.py
 ```
+- Dentro do CLI inserir 2 e pressionar enter.
 
 ### Terminal 3
 ```bash
-python main.py --site-id C --port 9003 --peers 127.0.0.1:9001,127.0.0.1:9002
+python main.py 
 ```
+- Dentro do CLI inserir 3 e pressionar enter.
 
-## How to Use (WIP)
+## Para rodar os testes
+
+### Teste 1 - Hello World! :D
 
 ```bash
-insert <position> <character> # Insert character at position
+python teste_1.py 
+```
+
+### Teste 2 - Inserções intercaladas
+
+```bash
+python teste_2.py 
+```
+
+## Como usar o CLI
+
+```bash
+insert <position> <character> # Insere o caractere na posição inserida
 ```
 
 ```bash
-delete <position> # Delete character at position
+delete <position> # Deleta caractere na posição
 ```
 
 ```bash
-show # Show current document state
+show # Mostra o estado atual do documento
 ```
 
 ```bash
-peers # Show connected peers
+peers # Mostra os peers conectados
 ```
 
 ```bash
-exit # Exit the program
+exit # Sai do programa
 ```
