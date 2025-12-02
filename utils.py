@@ -23,6 +23,8 @@ class VectorClock:
         return VectorClock(d or {})
 
     def happens_before(self, other: "VectorClock") -> bool:
+        # Retorna True se este VC é estritamente menor que o outro.
+        # Usado para decidir causalidade ou concorrência.
         less_or_equal = True
         strictly_less = False
         all_sites = set(list(self.v.keys()) + list(other.v.keys()))
@@ -83,7 +85,7 @@ class PositionID:
 class Char:
     value: str
     id: PositionID
-    parent: Optional[PositionID] = None # adicionei lógica de predecessor, para garantir 
+    parent: Optional[PositionID] = None # adicionei lógica de predecessor, para garantir
     deleted: bool = False
 
     def serialize(self):
@@ -93,6 +95,6 @@ class Char:
     def deserialize(d):
         return Char(d["value"], PositionID.deserialize(d["id"]), PositionID.deserialize(d.get("parent")), d["deleted"])
 
-# helper: op id - we encode operation identity as same as PositionID for inserts; for deletes use target id
+# helper: op id - codificamos a identidade da operação da mesma forma que PositionID para inserções; para exclusões, usamos o target id
 def op_id_from_position(pid: PositionID) -> str:
     return json.dumps(pid.serialize(), sort_keys=True)

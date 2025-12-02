@@ -124,10 +124,6 @@ class Node:
         except Exception:
             traceback.print_exc()
 
-    # ==========================
-    # Insert
-    # ==========================
-
     # Aplica um insert estilo RGA simplificado, seguindo uma lógica de predecessor (parent), com buffer de pendentes
     def _merge_insert(self, op: dict):
         pid = PositionID.deserialize(op.get("op_id"))
@@ -221,9 +217,6 @@ class Node:
             # agora que garantimos que o parent existe; chamamos _merge_insert de novo
             self._merge_insert(child_op)
 
-    # ==========================
-    # Delete
-    # ==========================
     def _merge_delete(self, op: dict):
         target_serial = op.get("target_id")
         if target_serial is None:
@@ -241,10 +234,6 @@ class Node:
         if isinstance(opid, dict) and opid.get("vclock"):
             for s, c in opid["vclock"].items():
                 self.vclock.v[s] = max(self.vclock.v.get(s, 0), c)
-
-    # ==========================
-    # Networking 
-    # ==========================
 
     def _start_networking(self):
         # inicia servidor para aceitar conexões de peers
