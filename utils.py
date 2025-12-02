@@ -83,23 +83,15 @@ class PositionID:
 class Char:
     value: str
     id: PositionID
+    parent: Optional[PositionID] = None # adicionei lógica de predecessor, para garantir 
     deleted: bool = False
 
     def serialize(self):
-        return {
-            "value": self.value,
-            "id": self.id.serialize() if self.id else None,
-            "deleted": self.deleted
-        }
+        return {"value": self.value, "id": self.id.serialize() if self.id else None, "parent": self.parent.serialize() if self.parent else None, "deleted": self.deleted}
 
     @staticmethod
     def deserialize(d):
-        return Char(
-            d["value"],
-            PositionID.deserialize(d["id"]),
-            d.get("deleted", False)
-        )
-
+        return Char(d["value"], PositionID.deserialize(d["id"]), PositionID.deserialize(d.get("parent")), d["deleted"])
 
 # helper: op id - we encode operation identity as same as PositionID for inserts; for deletes use target id
 def op_id_from_position(pid: PositionID) -> str:
