@@ -48,7 +48,7 @@ class Node:
             visible = [c for c in self.replica if not c.deleted]
 
             if position_index < 0:
-                position_index = 0
+                position_index = -1
             if position_index > len(visible):
                 position_index = len(visible)
 
