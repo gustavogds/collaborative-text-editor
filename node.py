@@ -183,8 +183,14 @@ class Node:
                 break
 
             # se o new_char deve vir antes de cur, paramos aqui
-            if new_char.id.before(cur.id):
+            # só compara IDs se estiver dentro da sublista de IRMÃOS
+            if same_parent:
+                if new_char.id.before(cur.id):
+                    break
+            else:
+                # encontrou um elemento que NÃO é da mesma família
                 break
+
 
             insert_idx += 1
 
